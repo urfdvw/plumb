@@ -14,17 +14,17 @@ export default function Viewfinder({
   const canvasRef = useRef(null)
   const [crop, setCrop] = useState(null)
   const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 })
-  const { gl } = useReprojection({ canvasRef, videoRef, videoReady, rotation, f35mm, videoSize })
+  const { stateRef } = useReprojection({ canvasRef, videoRef, videoReady, rotation, f35mm })
   const { findCrop } = useValidCrop()
 
   // Update crop every 200ms
   useEffect(() => {
     let id
     function update() {
-      const gl_ = gl.current
+      const state = stateRef.current
       const canvas = canvasRef.current
-      if (gl_ && canvas && videoReady) {
-        const c = findCrop(gl_, canvas.width, canvas.height)
+      if (state && canvas && videoReady && canvas.width > 0) {
+        const c = findCrop(state.gl, canvas.width, canvas.height)
         setCrop(c)
         setCanvasSize({ width: canvas.width, height: canvas.height })
         if (c) onCropUpdate?.(c)
@@ -33,7 +33,7 @@ export default function Viewfinder({
     }
     update()
     return () => clearTimeout(id)
-  }, [gl, findCrop, videoReady, onCropUpdate])
+  }, [stateRef, findCrop, videoReady, onCropUpdate])
 
   const handleTap = useCallback((e) => {
     if (e.touches?.length > 1) return

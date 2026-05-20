@@ -10,95 +10,107 @@ function compileShader(gl, type, src) {
   return s
 }
 
-function buildProgram(gl) {
+function initGL(canvas) {
+  const gl = canvas.getContext('webgl', { preserveDrawingBuffer: true })
+  if (!gl) return null
+
   const prog = gl.createProgram()
   gl.attachShader(prog, compileShader(gl, gl.VERTEX_SHADER, VERTEX_SHADER))
   gl.attachShader(prog, compileShader(gl, gl.FRAGMENT_SHADER, FRAGMENT_SHADER))
   gl.linkProgram(prog)
-  if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(prog))
-  return prog
+  if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) return null
+  gl.useProgram(prog)
+
+  const buf = gl.createBuffer()
+  gl.bindBuffer(gl.ARRAY_BUFFER, buf)
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 1,-1, -1,1, 1,1]), gl.STATIC_DRAW)
+  const aPos = gl.getAttribLocation(prog, 'aPos')
+  gl.enableVertexAttribArray(aPos)
+  gl.vertexAttribPointer(aPos, 2, gl.FLOAT, false, 0, 0)
+
+  const tex = gl.createTexture()
+  gl.bindTexture(gl.TEXTURE_2D, tex)
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR)
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR)
+
+  const u = {
+    uR: gl.getUniformLocation(prog, 'uR'),
+    uFD: gl.getUniformLocation(prog, 'uFD'),
+    uFS: gl.getUniformLocation(prog, 'uFS'),
+    uK: gl.getUniformLocation(prog, 'uK'),
+    uRes: gl.getUniformLocation(prog, 'uRes'),
+    uImgRes: gl.getUniformLocation(prog, 'uImgRes'),
+    uImg: gl.getUniformLocation(prog, 'uImg'),
+  }
+  gl.uniform1i(u.uImg, 0)
+  gl.uniform1f(u.uK, 0.0)
+
+  return { gl, tex, u }
 }
 
-export default function useReprojection({ canvasRef, videoRef, videoReady, rotation, f35mm, videoSize }) {
-  const glRef = useRef(null)
-  const progRef = useRef(null)
-  const texRef = useRef(null)
+export default function useReprojection({ canvasRef, videoRef, videoReady, rotation, f35mm }) {
+  const stateRef = useRef(null) // { gl, tex, u }
   const rafRef = useRef(null)
-  const uniformsRef = useRef({})
 
+  // Set canvas pixel dimensions and (re)init WebGL whenever the canvas CSS size changes.
+  // Setting canvas.width/height resets the WebGL context, so we must call initGL after.
   useEffect(() => {
     const canvas = canvasRef.current
     if (!canvas) return
-    const gl = canvas.getContext('webgl', { preserveDrawingBuffer: true })
-    if (!gl) return
-    glRef.current = gl
+    let active = true
 
-    try {
-      const prog = buildProgram(gl)
-      progRef.current = prog
-      gl.useProgram(prog)
-
-      const buf = gl.createBuffer()
-      gl.bindBuffer(gl.ARRAY_BUFFER, buf)
-      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 1,-1, -1,1, 1,1]), gl.STATIC_DRAW)
-      const aPos = gl.getAttribLocation(prog, 'aPos')
-      gl.enableVertexAttribArray(aPos)
-      gl.vertexAttribPointer(aPos, 2, gl.FLOAT, false, 0, 0)
-
-      const tex = gl.createTexture()
-      gl.bindTexture(gl.TEXTURE_2D, tex)
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR)
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR)
-      texRef.current = tex
-
-      uniformsRef.current = {
-        uR: gl.getUniformLocation(prog, 'uR'),
-        uFD: gl.getUniformLocation(prog, 'uFD'),
-        uFS: gl.getUniformLocation(prog, 'uFS'),
-        uK: gl.getUniformLocation(prog, 'uK'),
-        uRes: gl.getUniformLocation(prog, 'uRes'),
-        uImgRes: gl.getUniformLocation(prog, 'uImgRes'),
-        uImg: gl.getUniformLocation(prog, 'uImg'),
+    function resize() {
+      const rect = canvas.getBoundingClientRect()
+      const w = Math.round((rect.width || window.innerWidth) * devicePixelRatio)
+      const h = Math.round((rect.height || window.innerHeight) * devicePixelRatio)
+      if (w === 0 || h === 0) return
+      if (canvas.width === w && canvas.height === h) return
+      canvas.width = w
+      canvas.height = h
+      // context was reset by the dimension change — re-init everything
+      try {
+        stateRef.current = initGL(canvas)
+        if (stateRef.current) {
+          stateRef.current.gl.viewport(0, 0, w, h)
+        }
+      } catch (e) {
+        console.error('WebGL init error', e)
       }
-      gl.uniform1i(uniformsRef.current.uImg, 0)
-      gl.uniform1f(uniformsRef.current.uK, 0.0)
-    } catch (e) {
-      console.error('WebGL setup error', e)
     }
 
-    return () => { cancelAnimationFrame(rafRef.current) }
+    // Initial sizing + init
+    resize()
+
+    const observer = new ResizeObserver(() => { if (active) resize() })
+    observer.observe(canvas)
+
+    return () => {
+      active = false
+      observer.disconnect()
+    }
   }, [canvasRef])
 
   const renderFrame = useCallback(() => {
-    const gl = glRef.current
+    const state = stateRef.current
     const canvas = canvasRef.current
     const video = videoRef.current
-    if (!gl || !canvas || !video || !videoReady) return
+    if (!state || !canvas || !video || !videoReady || canvas.width === 0) return
 
-    const w = canvas.clientWidth * devicePixelRatio
-    const h = canvas.clientHeight * devicePixelRatio
-    if (canvas.width !== w || canvas.height !== h) {
-      canvas.width = Math.round(w)
-      canvas.height = Math.round(h)
-      gl.viewport(0, 0, canvas.width, canvas.height)
-    }
-
-    gl.bindTexture(gl.TEXTURE_2D, texRef.current)
+    const { gl, tex, u } = state
+    gl.bindTexture(gl.TEXTURE_2D, tex)
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, video)
 
-    const u = uniformsRef.current
     const fp = focalPx(f35mm, canvas.width, canvas.height)
     gl.uniformMatrix3fv(u.uR, false, rotation)
     gl.uniform1f(u.uFD, fp)
     gl.uniform1f(u.uFS, fp)
     gl.uniform2f(u.uRes, canvas.width, canvas.height)
-    // Use canvas dims as source space so the video fills the canvas exactly
     gl.uniform2f(u.uImgRes, canvas.width, canvas.height)
 
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4)
-  }, [canvasRef, videoRef, videoReady, rotation, f35mm, videoSize])
+  }, [canvasRef, videoRef, videoReady, rotation, f35mm])
 
   useEffect(() => {
     let active = true
@@ -111,5 +123,5 @@ export default function useReprojection({ canvasRef, videoRef, videoReady, rotat
     return () => { active = false; cancelAnimationFrame(rafRef.current) }
   }, [renderFrame])
 
-  return { gl: glRef }
+  return { stateRef }
 }
