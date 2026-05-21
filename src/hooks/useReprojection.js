@@ -52,7 +52,7 @@ function initGL(canvas) {
   return { gl, tex, u }
 }
 
-export default function useReprojection({ canvasRef, videoRef, videoReady, rotation, f35mm, zoomScale = 1, panY = 0 }) {
+export default function useReprojection({ canvasRef, videoRef, videoReady, rotation, f35mm, zoomScale = 1, panY = 0, videoSize }) {
   const stateRef = useRef(null) // { gl, tex, u }
   const rafRef = useRef(null)
 
@@ -106,16 +106,19 @@ export default function useReprojection({ canvasRef, videoRef, videoReady, rotat
     gl.bindTexture(gl.TEXTURE_2D, tex)
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, video)
 
-    const fp = focalPx(f35mm, canvas.width, canvas.height)
+    const srcW = videoSize?.width ?? canvas.width
+    const srcH = videoSize?.height ?? canvas.height
+    const fpDst = focalPx(f35mm, canvas.width)
+    const fpSrc = focalPx(f35mm, srcW)
     gl.uniformMatrix3fv(u.uR, false, rotation)
-    gl.uniform1f(u.uFD, fp * zoomScale)
-    gl.uniform1f(u.uFS, fp)
+    gl.uniform1f(u.uFD, fpDst * zoomScale)
+    gl.uniform1f(u.uFS, fpSrc)
     gl.uniform2f(u.uRes, canvas.width, canvas.height)
-    gl.uniform2f(u.uImgRes, canvas.width, canvas.height)
+    gl.uniform2f(u.uImgRes, srcW, srcH)
     gl.uniform1f(u.uPanY, panY * window.devicePixelRatio)
 
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4)
-  }, [canvasRef, videoRef, videoReady, rotation, f35mm, zoomScale, panY])
+  }, [canvasRef, videoRef, videoReady, rotation, f35mm, zoomScale, panY, videoSize])
 
   useEffect(() => {
     let active = true

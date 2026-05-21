@@ -19,7 +19,7 @@ export default function Viewfinder({
   const [zoomScale, setZoomScale] = useState(1)
   const pinchRef = useRef(null)   // { startDist, startScale }
 
-  const { stateRef } = useReprojection({ canvasRef, videoRef, videoReady, rotation, f35mm, zoomScale, panY })
+  const { stateRef } = useReprojection({ canvasRef, videoRef, videoReady, rotation, f35mm, zoomScale, panY, videoSize })
   const { findCrop } = useValidCrop()
 
   // Update crop every 200ms
