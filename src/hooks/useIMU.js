@@ -15,8 +15,7 @@ export default function useIMU() {
     const handler = (e) => {
       if (e.beta == null) return
       const pitch = 90 - e.beta
-      // e.gamma positive = phone tilts right; correction needs opposite sign
-      const roll = -(e.gamma ?? 0)
+      const roll = e.gamma ?? 0
       setOrientation({ pitch, roll })
     }
 
