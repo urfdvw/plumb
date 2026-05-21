@@ -68,7 +68,7 @@ export default function useYawGesture() {
       lastXRef.current = e.touches[0].clientX
       setYaw(clampYaw(startYawRef.current - dx / PX_PER_DEG))
     } else if (dirRef.current === 'v') {
-      updatePanY(clampPanY(startPanYRef.current + dy))
+      updatePanY(clampPanY(startPanYRef.current - dy))
     }
   }, [updatePanY])
 
