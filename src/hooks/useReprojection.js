@@ -43,14 +43,16 @@ function initGL(canvas) {
     uRes: gl.getUniformLocation(prog, 'uRes'),
     uImgRes: gl.getUniformLocation(prog, 'uImgRes'),
     uImg: gl.getUniformLocation(prog, 'uImg'),
+    uPanY: gl.getUniformLocation(prog, 'uPanY'),
   }
   gl.uniform1i(u.uImg, 0)
   gl.uniform1f(u.uK, 0.0)
+  gl.uniform1f(u.uPanY, 0.0)
 
   return { gl, tex, u }
 }
 
-export default function useReprojection({ canvasRef, videoRef, videoReady, rotation, f35mm }) {
+export default function useReprojection({ canvasRef, videoRef, videoReady, rotation, f35mm, zoomScale = 1, panY = 0 }) {
   const stateRef = useRef(null) // { gl, tex, u }
   const rafRef = useRef(null)
 
@@ -106,13 +108,14 @@ export default function useReprojection({ canvasRef, videoRef, videoReady, rotat
 
     const fp = focalPx(f35mm, canvas.width, canvas.height)
     gl.uniformMatrix3fv(u.uR, false, rotation)
-    gl.uniform1f(u.uFD, fp)
+    gl.uniform1f(u.uFD, fp * zoomScale)
     gl.uniform1f(u.uFS, fp)
     gl.uniform2f(u.uRes, canvas.width, canvas.height)
     gl.uniform2f(u.uImgRes, canvas.width, canvas.height)
+    gl.uniform1f(u.uPanY, panY * window.devicePixelRatio)
 
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4)
-  }, [canvasRef, videoRef, videoReady, rotation, f35mm])
+  }, [canvasRef, videoRef, videoReady, rotation, f35mm, zoomScale, panY])
 
   useEffect(() => {
     let active = true

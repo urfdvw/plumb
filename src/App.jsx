@@ -33,7 +33,7 @@ export default function App() {
   const [selectedCameraId, setSelectedCameraId] = useState(null)
   const { videoRef, ready: cameraReady, error: cameraError, videoSize, setFocusPoint, cameraList } = useCamera(selectedCameraId)
   const { photos, addPhoto, removePhoto } = useSession()
-  const { yaw, swiping, onTouchStart, onTouchMove, onTouchEnd } = useYawGesture()
+  const { yaw, panY, swiping, onTouchStart, onTouchMove, onTouchEnd } = useYawGesture()
 
   // Map available cameras to lens chips (back cameras only, up to 4)
   const LENS_LABELS = ['Ultra', 'Wide', 'Main', 'Tele']
@@ -125,6 +125,7 @@ export default function App() {
         showHorizon={showHorizon}
         roll={roll}
         yaw={activeYaw}
+        panY={panY}
         swiping={swiping}
         onTouchStart={onTouchStart}
         onTouchMove={onTouchMove}

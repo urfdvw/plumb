@@ -7,14 +7,19 @@ import YawIndicator from './YawIndicator'
 
 export default function Viewfinder({
   videoRef, videoReady, rotation, f35mm, videoSize,
-  showHorizon, roll, yaw, swiping,
+  showHorizon, roll, yaw, panY, swiping,
   onTouchStart, onTouchMove, onTouchEnd,
   onCapture, onFocusPoint, onCropUpdate
 }) {
   const canvasRef = useRef(null)
   const [crop, setCrop] = useState(null)
   const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 })
-  const { stateRef } = useReprojection({ canvasRef, videoRef, videoReady, rotation, f35mm })
+
+  // Pinch-to-zoom state
+  const [zoomScale, setZoomScale] = useState(1)
+  const pinchRef = useRef(null)   // { startDist, startScale }
+
+  const { stateRef } = useReprojection({ canvasRef, videoRef, videoReady, rotation, f35mm, zoomScale, panY })
   const { findCrop } = useValidCrop()
 
   // Update crop every 200ms
@@ -44,26 +49,31 @@ export default function Viewfinder({
     onFocusPoint?.(clientX - rect.left, clientY - rect.top, rect.width, rect.height)
   }, [onFocusPoint])
 
-  // Pinch-to-zoom state
-  const pinchRef = useRef(null)
+  function pinchDist(e) {
+    const dx = e.touches[0].clientX - e.touches[1].clientX
+    const dy = e.touches[0].clientY - e.touches[1].clientY
+    return Math.sqrt(dx * dx + dy * dy)
+  }
+
   function handleTouchStartInner(e) {
     if (e.touches.length === 2) {
-      const dx = e.touches[0].clientX - e.touches[1].clientX
-      const dy = e.touches[0].clientY - e.touches[1].clientY
-      pinchRef.current = Math.sqrt(dx*dx + dy*dy)
+      pinchRef.current = { startDist: pinchDist(e), startScale: zoomScale }
     } else {
       onTouchStart(e)
     }
   }
+
   function handleTouchMoveInner(e) {
     if (e.touches.length === 2 && pinchRef.current) {
-      // pinch handled by parent if needed
+      const scale = (pinchDist(e) / pinchRef.current.startDist) * pinchRef.current.startScale
+      setZoomScale(Math.max(0.5, Math.min(5, scale)))
     } else {
       onTouchMove(e)
     }
   }
+
   function handleTouchEndInner(e) {
-    pinchRef.current = null
+    if (e.touches.length < 2) pinchRef.current = null
     onTouchEnd(e)
   }
 

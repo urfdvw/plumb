@@ -18,10 +18,12 @@ export const FRAGMENT_SHADER = `
   uniform float uFD;   // dest focal length px
   uniform float uFS;   // source focal length px
   uniform float uK;    // fisheye blend (0=rectilinear)
+  uniform float uPanY; // vertical pan in canvas pixels
 
   void main() {
     // Output pixel → normalized device coords centered
     vec2 pd = (vUV - 0.5) * uRes;
+    pd.y -= uPanY;
 
     // Back-project through destination (virtual corrected) camera
     vec3 ray = normalize(vec3(pd / uFD, 1.0));
