@@ -14,7 +14,8 @@ export default function useIMU() {
 
     const handler = (e) => {
       if (e.beta == null) return
-      const pitch = Math.max(-75, Math.min(75, e.beta))
+      // e.beta is 0° when flat, 90° when upright. Subtract 90° so 0° = no correction needed.
+      const pitch = Math.max(-75, Math.min(75, e.beta - 90))
       const roll = e.gamma ?? 0
       setOrientation({ pitch, roll })
     }

@@ -97,8 +97,10 @@ export default function useReprojection({ canvasRef, videoRef, videoReady, rotat
     const canvas = canvasRef.current
     const video = videoRef.current
     if (!state || !canvas || !video || !videoReady || canvas.width === 0) return
+    if (video.readyState < 2) return  // no frame available yet
 
     const { gl, tex, u } = state
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true)
     gl.bindTexture(gl.TEXTURE_2D, tex)
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, video)
 
