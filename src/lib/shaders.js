@@ -26,8 +26,8 @@ export const FRAGMENT_SHADER = `
     // Back-project through destination (virtual corrected) camera
     vec3 ray = normalize(vec3(pd / uFD, 1.0));
 
-    // Apply inverse rotation (transpose = inverse for orthogonal R)
-    vec3 rr = transpose(uR) * ray;
+    // Apply rotation: R maps virtual→actual camera space (same as reference)
+    vec3 rr = uR * ray;
 
     // Project onto source image plane
     if (rr.z <= 0.0) { gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0); return; }
