@@ -54,7 +54,7 @@ export default function App() {
   const pitch = settings.autoLevel ? rawPitch : 0
   const roll = settings.autoLevel ? rawRoll : 0
   const activeYaw = settings.yawEnabled ? yaw : 0
-  const rotation = buildRotation(pitch, roll, activeYaw)
+  const rotation = buildRotation(-pitch, roll, activeYaw)
 
   const handleCapture = useCallback(() => {
     const canvas = document.querySelector('canvas')
