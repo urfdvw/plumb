@@ -30,9 +30,24 @@ export default function App() {
   const { orientation, available: imuAvailable } = useIMU()
   const [manualPitch, setManualPitch] = useState(0)
   const [manualRoll, setManualRoll] = useState(0)
-  const { videoRef, ready: cameraReady, error: cameraError, videoSize, setFocusPoint } = useCamera()
+  const [selectedCameraId, setSelectedCameraId] = useState(null)
+  const { videoRef, ready: cameraReady, error: cameraError, videoSize, setFocusPoint, cameraList } = useCamera(selectedCameraId)
   const { photos, addPhoto, removePhoto } = useSession()
   const { yaw, swiping, onTouchStart, onTouchMove, onTouchEnd } = useYawGesture()
+
+  // Map available cameras to lens chips (back cameras only, up to 4)
+  const LENS_LABELS = ['Ultra', 'Wide', 'Main', 'Tele']
+  const LENS_F35 = [13, 24, 28, 85]
+  const backCameras = cameraList.filter(c =>
+    !c.label.toLowerCase().includes('front') && !c.label.includes('user')
+  )
+  const lenses = backCameras.length > 1
+    ? backCameras.slice(0, 4).map((cam, i) => ({
+        label: LENS_LABELS[i] ?? `Cam${i + 1}`,
+        f35mm: LENS_F35[i] ?? 28,
+        deviceId: cam.deviceId
+      }))
+    : null  // null → LensChips uses hardcoded defaults (focal-length-only mode)
 
   const rawPitch = imuAvailable ? orientation.pitch : manualPitch
   const rawRoll = imuAvailable ? orientation.roll : manualRoll
@@ -124,7 +139,15 @@ export default function App() {
         flexShrink: 0, display: 'flex', flexDirection: 'column'
       }}>
         <ShutterButton onCapture={handleCapture} />
-        <LensChips currentF={settings.f35mm} onChange={f => setSettings(s => ({ ...s, f35mm: f }))} />
+        <LensChips
+          lenses={lenses}
+          currentF={settings.f35mm}
+          currentDeviceId={selectedCameraId}
+          onChange={({ f35mm, deviceId }) => {
+            setSettings(s => ({ ...s, f35mm }))
+            if (deviceId) setSelectedCameraId(deviceId)
+          }}
+        />
         <ThumbnailStrip photos={photos} onTap={setSelectedPhoto} />
       </div>
 
